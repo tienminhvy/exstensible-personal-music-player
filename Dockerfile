@@ -1,4 +1,4 @@
-# Lightweight app image per ADR-0005: multi-stage (deps -> build -> runtime),
+# Lightweight app image: multi-stage (deps -> build -> runtime),
 # alpine-class base, production-only deps, non-root user. ffmpeg + python3
 # exist only in the runtime stage: yt-dlp ships as a self-contained
 # python zipapp in youtube-dl-exec/bin, and extraction needs ffmpeg.
