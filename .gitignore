@@ -24,3 +24,6 @@ vite.config.ts.timestamp-*
 
 # Prisma generated client
 src/generated
+
+# Media library (bind-mounted in production; binary files never in git)
+data/
