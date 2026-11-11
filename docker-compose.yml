@@ -1,0 +1,38 @@
+# Serving stack per ADR-0005: the app container plus Postgres. pgdata and
+# media live under ./data (docs/legacy/stack-deployment.md data-layout
+# policy). Schema setup is an explicit operator step
+# (`docker compose run --rm app npx prisma@7.10.1 migrate deploy`); boot
+# never mutates the schema (legacy fc346c3 learning).
+services:
+    db:
+        image: postgres:15-alpine
+        environment:
+            POSTGRES_USER: pmp
+            POSTGRES_DB: music
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+        volumes:
+            # Bind PGDATA directly (overrides the image's own VOLUME so pgdata
+            # stays under ./data). The bind root must stay empty for first
+            # init: initdb refuses mount points holding dot-files. After init
+            # PG_VERSION proves the bind layout on later boots.
+            - ./data/postgres:/var/lib/postgresql/data
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -h localhost -U pmp -d music']
+            interval: 5s
+            timeout: 5s
+            retries: 10
+    app:
+        build: .
+        image: pmp-app
+        depends_on:
+            db:
+                condition: service_healthy
+        environment:
+            DATABASE_URL: postgres://pmp:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/music
+            MEDIA_DIR: /data
+            PORT: ${PORT:-3000}
+            YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+        volumes:
+            - ./data:/data
+        ports:
+            - '3000:3000'
