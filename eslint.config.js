@@ -19,6 +19,6 @@ export default ts.config(
 		languageOptions: { parserOptions: { parser: ts.parser } }
 	},
 	{
-		ignores: ['build/', '.output/', '.svelte-kit/']
+		ignores: ['build/', '.output/', '.svelte-kit/', 'src/generated/']
 	}
 );
