@@ -1,0 +1,107 @@
+/*
+ * Theme palettes applied via [data-theme] on the document element; the
+ * value persists in localStorage — one device, one preference
+ * (census app-shell.md known-bug warning).
+ */
+:root,
+[data-theme='light'] {
+    color-scheme: light;
+    --Background: #faf7f1;
+    --Surface: #ffffff;
+    --Text: #25201a;
+    --Muted: #716a5f;
+    --Accent: #a4570b;
+    --OnAccent: #ffffff;
+    --Border: #e6dfd3;
+}
+
+[data-theme='night'] {
+    color-scheme: dark;
+    --Background: #17110b;
+    --Surface: #241a10;
+    --Text: #ecd9b8;
+    --Muted: #a38c67;
+    --Accent: #e8a13c;
+    --OnAccent: #1c1206;
+    --Border: #3d2e1c;
+}
+
+[data-theme='dark'] {
+    color-scheme: dark;
+    --Background: #121316;
+    --Surface: #1c1e23;
+    --Text: #e7e9ee;
+    --Muted: #8f94a1;
+    --Accent: #d99a3d;
+    --OnAccent: #1c1206;
+    --Border: #2b2e35;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--Background);
+    color: var(--Text);
+    font-family:
+        system-ui,
+        -apple-system,
+        'Segoe UI',
+        sans-serif;
+    transition:
+        background-color 200ms ease,
+        color 200ms ease;
+}
+
+button,
+input {
+    color: inherit;
+    font: inherit;
+}
+
+a {
+    color: var(--Accent);
+}
+
+.Panel {
+    padding: 16px;
+    border: 1px solid var(--Border);
+    border-radius: 12px;
+    background: var(--Surface);
+}
+
+.Panel h2 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+}
+
+.InputLabel {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--Muted);
+    font-size: 0.85rem;
+}
+
+.TextInput {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--Border);
+    border-radius: 8px;
+    background: var(--Background);
+}
+
+.Hint {
+    min-height: 1.2em;
+    margin: 8px 0 2px;
+    color: var(--Muted);
+    font-size: 0.85rem;
+}
+
+.TextInput:focus,
+.ThemeButton:focus,
+.ImportButton:focus {
+    outline: 2px solid var(--Accent);
+    outline-offset: 1px;
+}
