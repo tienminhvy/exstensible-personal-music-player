@@ -1,5 +1,12 @@
-import 'dotenv/config';
 import { defineConfig } from 'prisma/config';
+
+// dotenv only exists in dev installs; slim runtime images (T6.1 Dockerfile)
+// run the CLI with real env vars and no .env file to load.
+try {
+    await import('dotenv/config');
+} catch {
+    // dotenv not installed: fall through, env vars are already set
+}
 
 export default defineConfig({
     schema: 'prisma/schema.prisma',
