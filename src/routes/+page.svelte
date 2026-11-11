@@ -1,6 +1,8 @@
 <script lang="ts">
     import LibraryPanel from '#lib/components/LibraryPanel.svelte';
+    import PlayerPanel from '#lib/components/PlayerPanel.svelte';
     import SearchPanel from '#lib/components/SearchPanel.svelte';
+    import { player } from '#lib/player.svelte.ts';
     import { theme, type Theme } from '#lib/theme.svelte.ts';
     import type { TrackRow } from '#lib/track.ts';
     import type { PageProps } from './$types';
@@ -54,8 +56,11 @@
         query={narrowQuery}
         loading={fetching}
         error={libraryError}
+        activeTrackId={player.current?.id ?? null}
+        onSelect={(track) => void player.select(track)}
         onNarrow={refreshLibrary}
     />
+    <PlayerPanel />
 </main>
 
 <style>

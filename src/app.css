@@ -101,6 +101,8 @@ a {
 
 .TextInput:focus,
 .ThemeButton:focus,
+.PlayButton:focus,
+.SeekBar:focus,
 .ImportButton:focus {
     outline: 2px solid var(--Accent);
     outline-offset: 1px;
