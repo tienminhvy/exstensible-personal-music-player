@@ -22,7 +22,8 @@ RUN apk add --no-cache ffmpeg python3
 
 COPY --from=build --chown=node:node /app/build build
 COPY --from=build --chown=node:node /app/node_modules node_modules
-COPY package.json package.json
+COPY prisma prisma
+COPY prisma.config.ts package.json ./
 
 USER node
 
