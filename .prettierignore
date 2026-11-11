@@ -4,3 +4,5 @@ build
 .svelte-kit
 package-lock.json
 src/generated
+Dockerfile
+.dockerignore
