@@ -1,4 +1,4 @@
-# Serving stack per ADR-0005: the app container plus Postgres. pgdata and
+# Serving stack: the app container plus Postgres. pgdata and
 # media live under ./data (docs/legacy/stack-deployment.md data-layout
 # policy). Schema setup is an explicit operator step
 # (`docker compose run --rm app npx prisma@7.10.1 migrate deploy`); boot
