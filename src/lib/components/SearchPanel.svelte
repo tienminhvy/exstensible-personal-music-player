@@ -1,6 +1,7 @@
 <script lang="ts">
     import { SvelteMap } from 'svelte/reactivity';
     import { debounce } from '#lib/debounce.ts';
+    import Icon from '#lib/components/Icon.svelte';
 
     interface VideoResult {
         videoId: string;
@@ -106,7 +107,12 @@
 
     async function loadFormats(result: VideoResult) {
         const videoId = result.videoId;
-        if (formatsStateByVideoId.get(videoId) === 'ready') {
+        /* 'ready' AND 'loading' both bail: focus regains on every click
+         * of the select, so without the loading guard each re-focus
+         * re-fired the metadata fetch (repair R1 pile-up bug). A failed
+         * load stays retryable on a later focus. */
+        const state = formatsStateByVideoId.get(videoId);
+        if (state === 'ready' || state === 'loading') {
             return;
         }
         formatsStateByVideoId.set(videoId, 'loading');
@@ -139,19 +145,6 @@
         } else {
             pickedByVideoId.delete(result.videoId);
         }
-    }
-
-    function importLabel(result: VideoResult): string {
-        if (importingId !== result.videoId) {
-            return 'Import';
-        }
-        if (importProgress && importProgress.percent !== null) {
-            return `Importing ${Math.round(importProgress.percent)}%`;
-        }
-        if (importProgress?.label) {
-            return `Importing ${importProgress.label}`;
-        }
-        return 'Importing…';
     }
 
     async function importTrack(result: VideoResult) {
@@ -282,26 +275,47 @@
                     {/if}
                 </span>
                 <span class="ImportControls">
-                    <select
-                        class="ResolutionSelect"
-                        aria-label="Video resolution for {result.title}"
-                        disabled={importingId !== '' || importedIds.has(result.videoId)}
-                        onfocus={() => loadFormats(result)}
-                        onchange={(event) => pickFormat(result, event)}
-                    >
-                        <option
-                            value=""
-                            selected={pickedByVideoId.get(result.videoId) === undefined}
+                    <!-- Repair R4: the option NEVER mutates after mount — a
+                         state machine of placeholder button (idle/loading/
+                         failed) → final ready select. Rebuilding a native
+                         select's children around an open popup glitched
+                         the user's machine (Brave/Fedora), so the ready
+                         select mounts fresh with its final option list. -->
+                    {#if formatsStateByVideoId.get(result.videoId) === 'loading'}
+                        <button
+                            type="button"
+                            class="ResolutionPlaceholder"
+                            disabled
+                            aria-label="Resolutions loading for {result.title}"
                         >
-                            Audio only
-                        </option>
-                        {#if formatsStateByVideoId.get(result.videoId) === 'loading'}
-                            <option value="" disabled>Loading resolutions…</option>
-                        {:else if formatsStateByVideoId.get(result.videoId) === 'failed'}
-                            <option value="" disabled>Resolutions unavailable</option>
-                        {:else if formatsStateByVideoId.get(result.videoId) === 'ready'}
-                            {@const options = formatsByVideoId.get(result.videoId) ?? []}
-                            {#each options as option, index (option.height)}
+                            <Icon name="video" />
+                            <span>Resolutions loading…</span>
+                        </button>
+                    {:else if formatsStateByVideoId.get(result.videoId) === 'failed'}
+                        <button
+                            type="button"
+                            class="ResolutionPlaceholder"
+                            aria-label="Resolutions unavailable for {result.title} — retry"
+                            title="Resolutions unavailable — retry"
+                            onclick={() => void loadFormats(result)}
+                        >
+                            <Icon name="video" />
+                            <span>Resolutions unavailable</span>
+                        </button>
+                    {:else if formatsStateByVideoId.get(result.videoId) === 'ready'}
+                        <select
+                            class="ResolutionSelect"
+                            aria-label="Video resolution for {result.title}"
+                            disabled={importingId !== '' || importedIds.has(result.videoId)}
+                            onchange={(event) => pickFormat(result, event)}
+                        >
+                            <option
+                                value=""
+                                selected={pickedByVideoId.get(result.videoId) === undefined}
+                            >
+                                Audio only
+                            </option>
+                            {#each formatsByVideoId.get(result.videoId) ?? [] as option, index (option.height)}
                                 <option
                                     value={String(index)}
                                     selected={pickedByVideoId.get(result.videoId) === option}
@@ -311,20 +325,52 @@
                                         : ` · ${Math.round(option.sizeBytes / 1048576)} MB`}
                                 </option>
                             {/each}
-                        {/if}
-                    </select>
+                        </select>
+                    {:else}
+                        <button
+                            type="button"
+                            class="ResolutionPlaceholder"
+                            aria-label="Load video resolutions for {result.title}"
+                            title="Choose video resolution"
+                            onpointerenter={() => void loadFormats(result)}
+                            onfocus={() => void loadFormats(result)}
+                            onclick={() => void loadFormats(result)}
+                        >
+                            <Icon name="video" />
+                            <span>Resolution</span>
+                        </button>
+                    {/if}
                     <button
                         class="ImportButton"
                         class:ImportButtonImported={importedIds.has(result.videoId)}
                         type="button"
                         disabled={importingId !== '' || importedIds.has(result.videoId)}
+                        aria-label={importingId === result.videoId
+                            ? `Importing ${result.title}`
+                            : importedIds.has(result.videoId)
+                              ? `${result.title} is already imported`
+                              : `Import ${result.title}`}
+                        title={importingId === result.videoId
+                            ? `Importing ${result.title}`
+                            : importedIds.has(result.videoId)
+                              ? `${result.title} is already imported`
+                              : `Import ${result.title}`}
                         onclick={() => importTrack(result)}
                     >
-                        {importingId === result.videoId
-                            ? importLabel(result)
-                            : importedIds.has(result.videoId)
-                              ? 'Imported'
-                              : 'Import'}
+                        {#if importingId === result.videoId}
+                            <span class="IconRow">
+                                <Icon name="import" />
+                                {#if importProgress?.percent !== null && importProgress?.percent !== undefined}
+                                    <span class="ImportPercent"
+                                        >{Math.round(importProgress.percent)}%</span
+                                    >
+                                {/if}
+                            </span>
+                        {:else if importedIds.has(result.videoId)}
+                            <Icon name="imported" />
+                        {:else}
+                            <Icon name="import" />
+                        {/if}
                     </button>
                 </span>
             </li>
@@ -408,6 +454,28 @@
         cursor: pointer;
     }
 
+    .ResolutionPlaceholder {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 148px;
+        padding: 5px 8px;
+        border: 1px solid var(--Border);
+        border-radius: 8px;
+        background: var(--Background);
+        color: var(--Muted);
+        font-size: 0.85rem;
+    }
+
+    .ResolutionPlaceholder :global(svg) {
+        display: block;
+    }
+
+    .ResolutionPlaceholder:disabled {
+        opacity: 0.55;
+        cursor: default;
+    }
+
     .ResolutionSelect:disabled {
         opacity: 0.55;
         cursor: default;
@@ -415,12 +483,30 @@
 
     .ImportButton {
         flex-shrink: 0;
-        padding: 6px 12px;
+        display: grid;
+        place-items: center;
+        min-width: 38px;
+        padding: 8px;
         border: 1px solid var(--Border);
         border-radius: 8px;
         background: var(--Accent);
         color: var(--OnAccent);
         cursor: pointer;
+    }
+
+    .ImportButton :global(svg) {
+        display: block;
+    }
+
+    .IconRow {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .ImportPercent {
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
     }
 
     .ImportButton:disabled {
