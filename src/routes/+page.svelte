@@ -1,6 +1,6 @@
 <script lang="ts">
     import LibraryPanel from '#lib/components/LibraryPanel.svelte';
-    import PlayerPanel from '#lib/components/PlayerPanel.svelte';
+    import PlayerDock from '#lib/components/PlayerDock.svelte';
     import SearchPanel from '#lib/components/SearchPanel.svelte';
     import { player } from '#lib/player.svelte.ts';
     import { theme, type Theme } from '#lib/theme.svelte.ts';
@@ -74,8 +74,9 @@
         onEnqueue={(track) => player.enqueue(track)}
         onNarrow={refreshLibrary}
     />
-    <PlayerPanel />
 </main>
+
+<PlayerDock />
 
 <style>
     .ShellHeader {
@@ -108,7 +109,9 @@
         gap: 14px;
         max-width: 1080px;
         margin: 0 auto;
-        padding: 14px 16px 40px;
+        /* Bottom padding clears the fixed player dock so the last library
+         * rows stay reachable above it. */
+        padding: 14px 16px 190px;
     }
 
     /* Mobile-first: the two panels sit side by side on wider screens. */
@@ -116,7 +119,7 @@
         .ShellMain {
             grid-template-columns: 1fr 1fr;
             align-items: start;
-            padding: 20px 24px 60px;
+            padding: 20px 24px 190px;
         }
     }
 </style>
