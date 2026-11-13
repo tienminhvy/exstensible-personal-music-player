@@ -25,10 +25,49 @@ const downloadFlags = () => {
     };
 };
 
+// Audio format matched to the requested video container so the ffmpeg
+// merge stays inside the promised <youtubeId>.<ext> (no mkv escape
+// across mixed containers); the keyset doubles as the ext whitelist.
+const AUDIO_FORMAT_BY_CONTAINER: Record<string, string> = {
+    mp4: 'm4a',
+    webm: 'webm',
+    '3gp': '3gp'
+};
+
 interface DownloadRequest {
     videoId?: unknown;
     channel?: unknown;
     thumbnailUrl?: unknown;
+    // A { height, ext, ... } option as served by GET /api/formats; label
+    // and sizeBytes ride along but only height + ext drive the download.
+    resolution?: unknown;
+}
+
+interface RequestedResolution {
+    height: number;
+    ext: string;
+}
+
+// null → audio-only (option absent, the default); 'invalid' → malformed
+// option answered with 400 rather than a quiet audio-only import
+// (sentinel pattern of the stream route's parseRange). 8192 is headroom
+// above YouTube's 4320 ceiling; what is actually selectable is the
+// formats endpoint's contract.
+function parseResolution(value: unknown): RequestedResolution | 'invalid' | null {
+    if (value === undefined || value === null) {
+        return null;
+    }
+    if (typeof value !== 'object' || Array.isArray(value)) {
+        return 'invalid';
+    }
+    const { height, ext } = value as Record<string, unknown>;
+    const heightOk =
+        typeof height === 'number' && Number.isInteger(height) && height > 0 && height <= 8192;
+    const extOk = typeof ext === 'string' && ext in AUDIO_FORMAT_BY_CONTAINER;
+    if (!heightOk || !extOk) {
+        return 'invalid';
+    }
+    return { height, ext };
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -38,6 +77,13 @@ export const POST: RequestHandler = async ({ request }) => {
     if (typeof videoId !== 'string' || !VIDEO_ID_PATTERN.test(videoId)) {
         return Response.json(
             { error: 'Send the YouTube videoId of a search result.' },
+            { status: 400 }
+        );
+    }
+    const resolution = parseResolution(body?.resolution);
+    if (resolution === 'invalid') {
+        return Response.json(
+            { error: 'resolution must be a height/ext option from /api/formats.' },
             { status: 400 }
         );
     }
@@ -54,17 +100,20 @@ export const POST: RequestHandler = async ({ request }) => {
     importsInFlight.add(videoId);
     try {
         const audioData = await downloadAudio(videoId);
-        const trackData = {
+        const videoPath = resolution ? await downloadVideo(videoId, resolution) : null;
+        const metadata = {
             ...audioData,
             channel: stringOrNull(body?.channel),
             thumbnailUrl: stringOrNull(body?.thumbnailUrl)
         };
+        // videoPath is sticky: an audio-only re-import keeps an existing
+        // track's video association; only a fresh video download rewrites
+        // it. Re-importing a known clip refreshes its row instead of
+        // duplicating it (unique youtubeId, legacy learning).
         const track = await prisma.track.upsert({
             where: { youtubeId: videoId },
-            // Re-importing a known clip refreshes its row instead of
-            // duplicating it (unique youtubeId, legacy learning).
-            update: trackData,
-            create: { youtubeId: videoId, ...trackData }
+            update: { ...metadata, ...(videoPath ? { videoPath } : {}) },
+            create: { youtubeId: videoId, ...metadata, ...(videoPath ? { videoPath } : {}) }
         });
         return Response.json(track);
     } catch (error) {
@@ -97,6 +146,31 @@ async function downloadAudio(youtubeId: string): Promise<ImportedAudio> {
         durationSec: roundedOrNull(metadata.duration)
     };
 }
+
+async function downloadVideo(
+    youtubeId: string,
+    { height, ext }: RequestedResolution
+): Promise<string> {
+    await youtubeDl(`https://www.youtube.com/watch?v=${youtubeId}`, videoFlags(height, ext));
+    const relativePath = `${youtubeId}.${ext}`;
+    if (!existsSync(join(MEDIA_DIR, relativePath))) {
+        throw new Error(`download did not produce ${relativePath}`);
+    }
+    return relativePath;
+}
+
+// Video + its container's audio in one file; forceOverwrites is what
+// lets a resolution switch replace a file yt-dlp would otherwise skip as
+// "already recorded" while keeping a stale resolution.
+const videoFlags = (height: number, ext: string) => {
+    return {
+        output: join(MEDIA_DIR, '%(id)s.%(ext)s'),
+        format: `bv*[height=${height}][ext=${ext}]+ba[ext=${AUDIO_FORMAT_BY_CONTAINER[ext]}]/b[height=${height}][ext=${ext}]`,
+        forceOverwrites: true,
+        noPlaylist: true,
+        quiet: true
+    };
+};
 
 interface ImportedAudio {
     title: string;
