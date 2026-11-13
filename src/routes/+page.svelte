@@ -2,6 +2,7 @@
     import LibraryPanel from '#lib/components/LibraryPanel.svelte';
     import PlayerDock from '#lib/components/PlayerDock.svelte';
     import SearchPanel from '#lib/components/SearchPanel.svelte';
+    import Icon from '#lib/components/Icon.svelte';
     import { player } from '#lib/player.svelte.ts';
     import { theme, type Theme } from '#lib/theme.svelte.ts';
     import type { TrackRow } from '#lib/track.ts';
@@ -57,8 +58,14 @@
 
 <header class="ShellHeader">
     <h1 class="ShellTitle">Personal Music Player</h1>
-    <button class="ThemeButton" type="button" onclick={() => theme.cycle()}>
-        Theme: {themeLabels[theme.current]}
+    <button
+        class="ThemeButton"
+        type="button"
+        aria-label="Cycle theme (currently {themeLabels[theme.current]})"
+        title="Cycle theme (currently {themeLabels[theme.current]})"
+        onclick={() => theme.cycle()}
+    >
+        <Icon name="theme" />
     </button>
 </header>
 
@@ -96,12 +103,18 @@
     }
 
     .ThemeButton {
-        min-width: 112px;
-        padding: 7px 14px;
+        display: grid;
+        place-items: center;
+        min-width: 38px;
+        padding: 8px;
         border: 1px solid var(--Border);
         border-radius: 999px;
         background: var(--Background);
         cursor: pointer;
+    }
+
+    .ThemeButton :global(svg) {
+        display: block;
     }
 
     .ShellMain {

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { debounce } from '#lib/debounce.ts';
+    import Icon from '#lib/components/Icon.svelte';
     import { formatClock } from '#lib/time.ts';
     import type { TrackRow } from '#lib/track.ts';
 
@@ -70,8 +71,14 @@
                         </span>
                         <span class="TrackDuration">{formatDuration(track.durationSec)}</span>
                     </button>
-                    <button class="EnqueueButton" type="button" onclick={() => onEnqueue(track)}>
-                        Enqueue
+                    <button
+                        class="EnqueueButton"
+                        type="button"
+                        aria-label="Add {track.title} to the queue"
+                        title="Add {track.title} to the queue"
+                        onclick={() => onEnqueue(track)}
+                    >
+                        <Icon name="enqueue" />
                     </button>
                 </div>
             </li>
@@ -165,12 +172,19 @@
 
     .EnqueueButton {
         flex-shrink: 0;
+        display: grid;
+        place-items: center;
         align-self: center;
-        padding: 7px 10px;
+        min-width: 38px;
+        padding: 8px;
         border: 1px solid var(--Border);
         border-radius: 8px;
         background: var(--Background);
         cursor: pointer;
+    }
+
+    .EnqueueButton :global(svg) {
+        display: block;
     }
 
     .TrackEmpty {
