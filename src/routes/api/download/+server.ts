@@ -1,15 +1,11 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { json } from '@sveltejs/kit';
 import type { Payload } from 'youtube-dl-exec';
 import { youtubeDl } from 'youtube-dl-exec';
 import { MEDIA_DIR } from '$app/env/private';
 import { prisma } from '#lib/server/prisma.ts';
+import { VIDEO_ID_PATTERN } from '#lib/server/video-id.ts';
 import type { RequestHandler } from './$types';
-
-// YouTube ids are exactly 11 chars of [A-Za-z0-9_-]; validating here also
-// keeps the id safe to embed in the media filename.
-const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 
 // Concurrent imports of the same clip corrupt its shared media file;
 // legacy gated downloads the same way (library-download.md, commit
@@ -40,16 +36,19 @@ export const POST: RequestHandler = async ({ request }) => {
     const videoId = body?.videoId;
 
     if (typeof videoId !== 'string' || !VIDEO_ID_PATTERN.test(videoId)) {
-        return json({ error: 'Send the YouTube videoId of a search result.' }, { status: 400 });
+        return Response.json(
+            { error: 'Send the YouTube videoId of a search result.' },
+            { status: 400 }
+        );
     }
     if (importsInFlight.has(videoId)) {
-        return json({ error: 'This track is already downloading.' }, { status: 409 });
+        return Response.json({ error: 'This track is already downloading.' }, { status: 409 });
     }
     // A missing media dir usually means a missing volume mount; silently
     // recreating it would strand the library (library-download.md known
     // bug warning).
     if (!existsSync(MEDIA_DIR)) {
-        return json({ error: 'Media dir is missing; import refused.' }, { status: 500 });
+        return Response.json({ error: 'Media dir is missing; import refused.' }, { status: 500 });
     }
 
     importsInFlight.add(videoId);
@@ -67,10 +66,13 @@ export const POST: RequestHandler = async ({ request }) => {
             update: trackData,
             create: { youtubeId: videoId, ...trackData }
         });
-        return json(track);
+        return Response.json(track);
     } catch (error) {
         console.error(`Import of ${videoId} failed:`, error);
-        return json({ error: 'Import failed; the download did not complete.' }, { status: 502 });
+        return Response.json(
+            { error: 'Import failed; the download did not complete.' },
+            { status: 502 }
+        );
     } finally {
         importsInFlight.delete(videoId);
     }
