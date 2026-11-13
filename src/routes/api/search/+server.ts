@@ -1,4 +1,3 @@
-import { json } from '@sveltejs/kit';
 import { YOUTUBE_API_KEY } from '$app/env/private';
 import type { RequestHandler } from './$types';
 
@@ -25,11 +24,11 @@ const RESULTS_LIMIT = 10;
 export const GET: RequestHandler = async ({ url }) => {
     const query = url.searchParams.get('q')?.trim();
     if (!query) {
-        return json({ error: 'Provide a search query.' }, { status: 400 });
+        return Response.json({ error: 'Provide a search query.' }, { status: 400 });
     }
 
     if (!YOUTUBE_API_KEY) {
-        return json({ error: 'YOUTUBE_API_KEY is not configured.' }, { status: 500 });
+        return Response.json({ error: 'YOUTUBE_API_KEY is not configured.' }, { status: 500 });
     }
 
     const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
@@ -41,11 +40,11 @@ export const GET: RequestHandler = async ({ url }) => {
 
     const response = await fetch(searchUrl);
     if (!response.ok) {
-        return json({ error: 'YouTube search failed.' }, { status: 502 });
+        return Response.json({ error: 'YouTube search failed.' }, { status: 502 });
     }
 
     const payload = (await response.json()) as { items?: YouTubeSearchItem[] };
-    return json(parseResults(payload));
+    return Response.json(parseResults(payload));
 };
 
 function parseResults(payload: { items?: YouTubeSearchItem[] }): VideoResult[] {

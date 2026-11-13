@@ -1,7 +1,6 @@
 import { createReadStream, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
-import { json } from '@sveltejs/kit';
 import { MEDIA_DIR } from '$app/env/private';
 import { prisma } from '#lib/server/prisma.ts';
 import type { RequestHandler } from './$types';
@@ -67,7 +66,7 @@ function audioResponse(
 export const GET: RequestHandler = async ({ params, request }) => {
     const track = await prisma.track.findUnique({ where: { id: params.id } });
     if (!track) {
-        return json({ error: 'Track not found.' }, { status: 404 });
+        return Response.json({ error: 'Track not found.' }, { status: 404 });
     }
     const audioFile = join(MEDIA_DIR, track.mediaPath);
     let size: number;
@@ -77,7 +76,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
         // Rows keep RELATIVE media paths on purpose (library-loss
         // incident); a missing file behind a live row is reported, not
         // recreated here.
-        return json({ error: 'File not found.' }, { status: 404 });
+        return Response.json({ error: 'File not found.' }, { status: 404 });
     }
 
     const mimeType = mimeTypeFor(audioFile);

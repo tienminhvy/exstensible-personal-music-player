@@ -1,4 +1,3 @@
-import { json } from '@sveltejs/kit';
 import { prisma } from '#lib/server/prisma.ts';
 import type { RequestHandler } from './$types';
 
@@ -9,5 +8,5 @@ export const GET: RequestHandler = async ({ url }) => {
         where: query ? { title: { contains: query, mode: 'insensitive' } } : undefined,
         orderBy: { createdAt: 'desc' }
     });
-    return json(tracks);
+    return Response.json(tracks);
 };
