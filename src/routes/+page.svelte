@@ -14,12 +14,25 @@
     let narrowQuery = $state('');
     let fetching = $state(false);
     let libraryError = $state('');
+    // Import state for search results: the loaded library plus every
+    // import made in this session. Built from data.tracks (the unfiltered
+    // initial load) rather than the displayed list, so narrowing cannot
+    // blind it.
+    let manualImportIds = $state<string[]>([]);
+    const importedIds = $derived(
+        new Set([...data.tracks.map((track) => track.youtubeId), ...manualImportIds])
+    );
 
     const themeLabels: Record<Theme, string> = {
         light: 'Light',
         night: 'Night',
         dark: 'Dark'
     };
+
+    function noteImported(videoId: string) {
+        manualImportIds.push(videoId);
+        void refreshLibrary(narrowQuery);
+    }
 
     async function refreshLibrary(query: string) {
         narrowQuery = query;
@@ -50,7 +63,7 @@
 </header>
 
 <main class="ShellMain">
-    <SearchPanel onImported={() => refreshLibrary(narrowQuery)} />
+    <SearchPanel {importedIds} onImported={noteImported} />
     <LibraryPanel
         {tracks}
         query={narrowQuery}

@@ -9,10 +9,11 @@
     }
 
     interface Props {
-        onImported: () => void;
+        importedIds: Set<string>;
+        onImported: (videoId: string) => void;
     }
 
-    let { onImported }: Props = $props();
+    let { importedIds, onImported }: Props = $props();
 
     let results = $state<VideoResult[]>([]);
     let searching = $state(false);
@@ -81,7 +82,7 @@
             });
             if (response.ok) {
                 importStatus = `Imported ${result.title}`;
-                onImported();
+                onImported(result.videoId);
             } else {
                 importStatus = importError(response.status);
             }
@@ -130,11 +131,16 @@
                 </span>
                 <button
                     class="ImportButton"
+                    class:ImportButtonImported={importedIds.has(result.videoId)}
                     type="button"
-                    disabled={importingId !== ''}
+                    disabled={importingId !== '' || importedIds.has(result.videoId)}
                     onclick={() => importTrack(result)}
                 >
-                    {importingId === result.videoId ? 'Importing…' : 'Import'}
+                    {importingId === result.videoId
+                        ? 'Importing…'
+                        : importedIds.has(result.videoId)
+                          ? 'Imported'
+                          : 'Import'}
                 </button>
             </li>
         {/each}
@@ -198,5 +204,11 @@
     .ImportButton:disabled {
         opacity: 0.55;
         cursor: default;
+    }
+
+    .ImportButtonImported {
+        background: var(--Background);
+        color: var(--Muted);
+        border-color: var(--Border);
     }
 </style>
