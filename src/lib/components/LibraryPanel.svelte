@@ -49,7 +49,22 @@
                     class:TrackRowActive={track.id === activeTrackId}
                     onclick={() => onSelect(track)}
                 >
-                    <span class="TrackTitle">{track.title}</span>
+                    {#if track.thumbnailUrl}
+                        <img
+                            class="TrackThumb"
+                            src={track.thumbnailUrl}
+                            alt=""
+                            loading="lazy"
+                            width="40"
+                            height="40"
+                        />
+                    {/if}
+                    <span class="TrackMain">
+                        <span class="TrackTitle">{track.title}</span>
+                        {#if track.channel}
+                            <span class="TrackChannel">{track.channel}</span>
+                        {/if}
+                    </span>
                     <span class="TrackDuration">{formatDuration(track.durationSec)}</span>
                 </button>
             </li>
@@ -81,11 +96,11 @@
 
     .TrackRow {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         justify-content: space-between;
         gap: 12px;
         width: 100%;
-        padding: 10px 12px;
+        padding: 8px 12px;
         border: 1px solid var(--Border);
         border-radius: 8px;
         background: var(--Background);
@@ -101,8 +116,30 @@
         color: var(--Accent);
     }
 
+    .TrackThumb {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 6px;
+        object-fit: cover;
+        background: var(--Border);
+    }
+
+    .TrackMain {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 2px;
+    }
+
     .TrackTitle {
         overflow-wrap: anywhere;
+    }
+
+    .TrackChannel {
+        overflow: hidden;
+        color: var(--Muted);
+        font-size: 0.8125rem;
     }
 
     .TrackDuration {
