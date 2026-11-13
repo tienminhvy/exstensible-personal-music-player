@@ -51,6 +51,40 @@ class PlayerStore {
         await this.#beginPlayback();
     }
 
+    /* Enqueue without stealing playback: the queue grows by one and no
+     * index, element, or epoch changes — even a pending natural-end
+     * advance stays valid (enqueue is not a user playback action).
+     * Duplicates are allowed; select jumps to an already-queued track. */
+    enqueue(track: TrackRow): void {
+        this.queue.push(track);
+    }
+
+    /* Adjacent-swap reorder that never disturbs playback: the element is
+     * untouched, so a playing track keeps playing while it moves slots.
+     * The current index follows the track across the swap (exact for
+     * adjacent swaps, duplicate ids included). Reordering is not a user
+     * playback action: the epoch does not bump. */
+    moveUp(index: number): void {
+        this.#swap(index, index - 1);
+    }
+
+    moveDown(index: number): void {
+        this.#swap(index, index + 1);
+    }
+
+    #swap(index: number, other: number): void {
+        if (index < 0 || index >= this.queue.length) return;
+        if (other < 0 || other >= this.queue.length) return;
+        const entry = this.queue[index];
+        this.queue[index] = this.queue[other];
+        this.queue[other] = entry;
+        if (this.currentIndex === index) {
+            this.currentIndex = other;
+        } else if (this.currentIndex === other) {
+            this.currentIndex = index;
+        }
+    }
+
     async next(): Promise<void> {
         if (!this.current) return;
         ++this.#epoch;

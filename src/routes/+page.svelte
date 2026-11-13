@@ -71,6 +71,7 @@
         error={libraryError}
         activeTrackId={player.current?.id ?? null}
         onSelect={(track) => void player.select(track)}
+        onEnqueue={(track) => player.enqueue(track)}
         onNarrow={refreshLibrary}
     />
     <PlayerPanel />

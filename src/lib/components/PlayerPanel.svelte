@@ -79,6 +79,39 @@
     {:else}
         <p class="Hint">Select a track in your library to play it.</p>
     {/if}
+    {#if browser && player.queue.length > 0}
+        <h3 class="QueueHeading">Queue ({player.queue.length})</h3>
+        <ol class="QueueList">
+            {#each player.queue as entry, index (index)}
+                <li class="QueueEntry" class:QueueEntryCurrent={index === player.currentIndex}>
+                    {#if index === player.currentIndex}
+                        <span class="QueueNow">Now</span>
+                    {/if}
+                    <span class="QueueTitle">{entry.title}</span>
+                    <span class="QueueActions">
+                        <button
+                            class="QueueMoveButton"
+                            type="button"
+                            disabled={index === 0}
+                            aria-label="Move {entry.title} up in the queue"
+                            onclick={() => player.moveUp(index)}
+                        >
+                            ↑
+                        </button>
+                        <button
+                            class="QueueMoveButton"
+                            type="button"
+                            disabled={index === player.queue.length - 1}
+                            aria-label="Move {entry.title} down in the queue"
+                            onclick={() => player.moveDown(index)}
+                        >
+                            ↓
+                        </button>
+                    </span>
+                </li>
+            {/each}
+        </ol>
+    {/if}
     {#if browser}
         <audio
             bind:this={audioElement}
@@ -161,6 +194,68 @@
         width: 100%;
         margin-top: 12px;
         accent-color: var(--Accent);
+    }
+
+    .QueueHeading {
+        margin: 14px 0 6px;
+        color: var(--Muted);
+        font-size: 0.9rem;
+    }
+
+    .QueueList {
+        display: grid;
+        gap: 6px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .QueueEntry {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 10px;
+        border: 1px solid var(--Border);
+        border-radius: 8px;
+    }
+
+    .QueueEntryCurrent {
+        border-color: var(--Accent);
+    }
+
+    .QueueNow {
+        flex-shrink: 0;
+        margin-right: 8px;
+        padding: 1px 8px;
+        border: 1px solid var(--Accent);
+        border-radius: 999px;
+        color: var(--Accent);
+        font-size: 0.75rem;
+    }
+
+    .QueueTitle {
+        overflow-wrap: anywhere;
+    }
+
+    .QueueActions {
+        display: flex;
+        flex-shrink: 0;
+        gap: 6px;
+    }
+
+    .QueueMoveButton {
+        min-width: 32px;
+        padding: 4px 8px;
+        border: 1px solid var(--Border);
+        border-radius: 6px;
+        background: var(--Background);
+        cursor: pointer;
+    }
+
+    .QueueMoveButton:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
     }
 
     .NativeAudio {

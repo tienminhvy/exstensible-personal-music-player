@@ -10,10 +10,12 @@
         error: string;
         activeTrackId: string | null;
         onSelect: (track: TrackRow) => void;
+        onEnqueue: (track: TrackRow) => void;
         onNarrow: (query: string) => void;
     }
 
-    let { tracks, query, loading, error, activeTrackId, onSelect, onNarrow }: Props = $props();
+    let { tracks, query, loading, error, activeTrackId, onSelect, onEnqueue, onNarrow }: Props =
+        $props();
 
     const narrow = debounce((value: string) => {
         onNarrow(value);
@@ -43,30 +45,35 @@
     <ul class="TrackList">
         {#each tracks as track (track.id)}
             <li>
-                <button
-                    class="TrackRow"
-                    type="button"
-                    class:TrackRowActive={track.id === activeTrackId}
-                    onclick={() => onSelect(track)}
-                >
-                    {#if track.thumbnailUrl}
-                        <img
-                            class="TrackThumb"
-                            src={track.thumbnailUrl}
-                            alt=""
-                            loading="lazy"
-                            width="40"
-                            height="40"
-                        />
-                    {/if}
-                    <span class="TrackMain">
-                        <span class="TrackTitle">{track.title}</span>
-                        {#if track.channel}
-                            <span class="TrackChannel">{track.channel}</span>
+                <div class="TrackRowCard">
+                    <button
+                        class="TrackRow"
+                        type="button"
+                        class:TrackRowActive={track.id === activeTrackId}
+                        onclick={() => onSelect(track)}
+                    >
+                        {#if track.thumbnailUrl}
+                            <img
+                                class="TrackThumb"
+                                src={track.thumbnailUrl}
+                                alt=""
+                                loading="lazy"
+                                width="40"
+                                height="40"
+                            />
                         {/if}
-                    </span>
-                    <span class="TrackDuration">{formatDuration(track.durationSec)}</span>
-                </button>
+                        <span class="TrackMain">
+                            <span class="TrackTitle">{track.title}</span>
+                            {#if track.channel}
+                                <span class="TrackChannel">{track.channel}</span>
+                            {/if}
+                        </span>
+                        <span class="TrackDuration">{formatDuration(track.durationSec)}</span>
+                    </button>
+                    <button class="EnqueueButton" type="button" onclick={() => onEnqueue(track)}>
+                        Enqueue
+                    </button>
+                </div>
             </li>
         {:else}
             <li class="TrackEmpty">
@@ -94,7 +101,15 @@
         list-style: none;
     }
 
+    .TrackRowCard {
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+    }
+
     .TrackRow {
+        flex: 1 1 auto;
+        min-width: 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -146,6 +161,16 @@
         flex-shrink: 0;
         color: var(--Muted);
         font-variant-numeric: tabular-nums;
+    }
+
+    .EnqueueButton {
+        flex-shrink: 0;
+        align-self: center;
+        padding: 7px 10px;
+        border: 1px solid var(--Border);
+        border-radius: 8px;
+        background: var(--Background);
+        cursor: pointer;
     }
 
     .TrackEmpty {
