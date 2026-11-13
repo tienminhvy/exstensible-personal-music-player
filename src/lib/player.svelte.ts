@@ -3,15 +3,14 @@ import type { TrackRow } from '#lib/track.ts';
 
 /* The media element doubles as the video display (legacy
  * library-download.md): a row carrying a video file streams its video
- * file (`?variant=video`) through the same element; audio-only rows keep
- * the plain audio stream. */
+ * file (`?variant=video`) through the same element — but only while the
+ * user has revealed the video display; otherwise every track (video
+ * rows included) plays the plain audio stream, so video never decodes
+ * in the background (repair R2: the always-decoding dock video froze
+ * the user's machine). */
 function streamUrl(trackId: string, variant: 'audio' | 'video'): string {
     const base = `/api/tracks/${trackId}/stream`;
     return variant === 'video' ? `${base}?variant=video` : base;
-}
-
-function variantFor(track: TrackRow | null): 'audio' | 'video' {
-    return track?.videoPath ? 'video' : 'audio';
 }
 
 export type RepeatMode = 'none' | 'all' | 'one';
@@ -92,6 +91,10 @@ class PlayerStore {
     currentTime = $state(0);
     duration = $state(0);
     error = $state('');
+    /* Video reveal (repair R2): video rows stream their audio variant
+     * until the user explicitly shows the video display. In-session
+     * only — never persisted, so a reload starts hidden again. */
+    videoRevealed = $state(false);
 
     #element: HTMLMediaElement | null = null;
     #epoch = 0;
@@ -212,6 +215,40 @@ class PlayerStore {
         }
     }
 
+    #currentVariant(): 'audio' | 'video' {
+        return this.current?.videoPath && this.videoRevealed ? 'video' : 'audio';
+    }
+
+    /* Show or hide the video display (repair R2). A videoPath row's
+     * element swaps variant at the current position, keeping the
+     * element identity (same DOM node, so attach/epoch/persistence
+     * contracts hold); playback resumes if it was playing. Audio-only
+     * rows and a hidden reveal need no reload. This is a user playback
+     * action: the epoch bumps. */
+    async setVideoReveal(on: boolean): Promise<void> {
+        if (this.videoRevealed === on) return;
+        this.videoRevealed = on;
+        const track = this.current;
+        const element = this.#element;
+        if (!track?.videoPath || !element) return;
+        ++this.#epoch;
+        const wasPlaying = !element.paused;
+        const position = element.currentTime;
+        element.src = streamUrl(track.id, on ? 'video' : 'audio');
+        element.load();
+        this.duration = track.durationSec ?? 0;
+        /* Planting currentTime before metadata loads keeps the position
+         * (same pre-metadata pattern the post-reload first Play uses). */
+        element.currentTime = position;
+        this.currentTime = position;
+        this.#applySpeed(element);
+        if (wasPlaying) {
+            await this.#start(element);
+        } else {
+            element.pause();
+        }
+    }
+
     toggle(): void {
         const element = this.#element;
         if (!element || !this.current) return;
@@ -304,15 +341,16 @@ class PlayerStore {
 
     /* Resume without clobbering a restored-but-not-yet-loaded element:
      * after a page reload nothing has a src yet, so the first Play loads
-     * the current track (through its variant: video rows stream the video
-     * file) and consumes the saved position (setting currentTime before
-     * metadata loads plants the default playback start position). A user
-     * seek cleared the saved position first. */
+     * the current track through its revealed variant (video rows stream
+     * the video file only while the video display is revealed, else the
+     * audio stream) and consumes the saved position (setting currentTime
+     * before metadata loads plants the default playback start position).
+     * A user seek cleared the saved position first. */
     async #resume(): Promise<void> {
         const element = this.#element;
         const track = this.current;
         if (!element || !track) return;
-        const variant = variantFor(track);
+        const variant = this.#currentVariant();
         if (element.getAttribute('src') !== streamUrl(track.id, variant)) {
             element.src = streamUrl(track.id, variant);
             element.load();
@@ -349,7 +387,7 @@ class PlayerStore {
         const element = this.#element;
         const track = this.current;
         if (!element || !track) return;
-        element.src = streamUrl(track.id, variantFor(track));
+        element.src = streamUrl(track.id, this.#currentVariant());
         element.load();
         this.currentTime = 0;
         this.duration = track.durationSec ?? 0;

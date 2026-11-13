@@ -1,6 +1,7 @@
 <script lang="ts">
     import { browser } from '$app/env';
-    import { player, type RepeatMode } from '#lib/player.svelte.ts';
+    import Icon from '#lib/components/Icon.svelte';
+    import { player } from '#lib/player.svelte.ts';
     import { formatClock } from '#lib/time.ts';
 
     let mediaElement = $state<HTMLVideoElement>();
@@ -23,11 +24,6 @@
         return () => window.removeEventListener('pagehide', flush);
     });
 
-    const repeatLabels: Record<RepeatMode, string> = {
-        none: 'Repeat: None',
-        all: 'Repeat: All',
-        one: 'Repeat: One'
-    };
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
     function onScrub(event: Event): void {
@@ -89,22 +85,52 @@
             </div>
             <div class="DockControls">
                 <button
-                    class="TransportButton"
+                    class="IconButton"
                     type="button"
+                    aria-label="Previous track"
+                    title="Previous track"
                     onclick={() => void player.previous()}
                 >
-                    Prev
+                    <Icon name="prev" />
                 </button>
-                <button class="PlayButton" type="button" onclick={() => player.toggle()}>
-                    {player.playing ? 'Pause' : 'Play'}
+                <button
+                    class="IconButton IconButtonPlay"
+                    type="button"
+                    aria-label={player.playing ? 'Pause' : 'Play'}
+                    title={player.playing ? 'Pause' : 'Play'}
+                    onclick={() => player.toggle()}
+                >
+                    {#if player.playing}
+                        <Icon name="pause" />
+                    {:else}
+                        <Icon name="play" />
+                    {/if}
                 </button>
-                <button class="TransportButton" type="button" onclick={() => void player.next()}>
-                    Next
+                <button
+                    class="IconButton"
+                    type="button"
+                    aria-label="Next track"
+                    title="Next track"
+                    onclick={() => void player.next()}
+                >
+                    <Icon name="next" />
                 </button>
-                <button class="RepeatButton" type="button" onclick={() => player.cycleRepeat()}>
-                    {repeatLabels[player.repeat]}
+                <button
+                    class="IconButton"
+                    class:IconButtonOff={player.repeat === 'none'}
+                    type="button"
+                    aria-label="Repeat: {player.repeat}"
+                    title="Repeat: {player.repeat}"
+                    onclick={() => player.cycleRepeat()}
+                >
+                    <Icon name="repeat" />
+                    {#if player.repeat === 'one'}
+                        <span class="ModeBadge">1</span>
+                    {/if}
                 </button>
-                <label class="SpeedLabel" for="player-speed">Speed</label>
+                <label class="SpeedLabel" for="player-speed" aria-label="Playback speed">
+                    <Icon name="speed" />
+                </label>
                 <select
                     id="player-speed"
                     class="SpeedSelect"
@@ -115,14 +141,29 @@
                         <option value={rate}>{rate}×</option>
                     {/each}
                 </select>
-                {#if player.current.videoPath}
+                {#if player.current?.videoPath}
                     <button
-                        class="FullscreenButton"
+                        class="IconButton"
+                        type="button"
+                        aria-pressed={player.videoRevealed}
+                        aria-label={player.videoRevealed
+                            ? 'Hide video display'
+                            : 'Show video display'}
+                        title={player.videoRevealed ? 'Hide video display' : 'Show video display'}
+                        onclick={() => void player.setVideoReveal(!player.videoRevealed)}
+                    >
+                        <Icon name="video" />
+                    </button>
+                {/if}
+                {#if player.current?.videoPath && player.videoRevealed}
+                    <button
+                        class="IconButton"
                         type="button"
                         aria-label="Toggle video fullscreen"
+                        title="Toggle video fullscreen"
                         onclick={() => void toggleFullscreen()}
                     >
-                        Fullscreen
+                        <Icon name="fullscreen" />
                     </button>
                 {/if}
             </div>
@@ -134,13 +175,16 @@
         {/if}
         {#if browser && player.queue.length > 0}
             <button
-                class="QueueToggle"
+                class="IconButton IconButtonWide"
                 type="button"
                 aria-expanded={queueOpen}
                 aria-controls="PlayerDockQueue"
+                aria-label="Toggle queue visibility"
+                title="Toggle queue visibility"
                 onclick={onQueueToggle}
             >
-                Queue ({player.queue.length})
+                <Icon name="queue" />
+                <span class="QueueCount">{player.queue.length}</span>
             </button>
             {#if queueOpen}
                 <ol class="QueueList" id="PlayerDockQueue">
@@ -182,7 +226,7 @@
     {#if browser}
         <video
             bind:this={mediaElement}
-            class={player.current?.videoPath ? 'DockVideo' : 'NativeMedia'}
+            class={player.current?.videoPath && player.videoRevealed ? 'DockVideo' : 'NativeMedia'}
             preload="metadata"
             playsinline
             ondblclick={toggleFullscreen}
@@ -218,8 +262,10 @@
     }
 
     /* The media element doubles as the video display: visible (bounded)
-     * while the current row carries a video file, hidden otherwise —
-     * audio-only rows look and play exactly as before. */
+     * only while the current row carries a video file AND the user has
+     * revealed the video display (repair R2 — hidden by default, video
+     * never decodes in the background); otherwise the element stays
+     * hidden and carries the audio stream. */
     .DockVideo {
         width: 100%;
         max-height: 40vh;
@@ -263,34 +309,73 @@
         gap: 10px;
     }
 
-    .TransportButton {
-        min-width: 62px;
-        padding: 7px 12px;
+    /* Icon-only control buttons (repair R3): the glyph is the visible
+     * affordance; every button's aria-label/title carries the full
+     * wording. */
+    .IconButton {
+        position: relative;
+        display: grid;
+        place-items: center;
+        min-width: 38px;
+        padding: 8px;
         border: 1px solid var(--Border);
         border-radius: 999px;
         background: var(--Background);
         cursor: pointer;
     }
 
-    .PlayButton {
-        min-width: 84px;
-        padding: 7px 14px;
-        border: 1px solid var(--Border);
+    .IconButton :global(svg) {
+        display: block;
+    }
+
+    .IconButtonPlay {
+        min-width: 44px;
+        border-color: var(--Accent);
+        background: var(--Accent);
+        color: var(--OnAccent);
+    }
+
+    .IconButtonOff {
+        opacity: 0.45;
+    }
+
+    .ModeBadge {
+        position: absolute;
+        top: -3px;
+        right: -3px;
+        min-width: 14px;
+        padding: 0 3px;
         border-radius: 999px;
         background: var(--Accent);
         color: var(--OnAccent);
-        cursor: pointer;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        line-height: 14px;
+        text-align: center;
     }
 
-    .RepeatButton {
+    .IconButtonWide {
+        justify-self: start;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
         padding: 5px 12px;
-        border: 1px solid var(--Border);
-        border-radius: 999px;
-        background: var(--Background);
-        cursor: pointer;
+    }
+
+    .QueueCount {
+        color: var(--Muted);
+        font-size: 0.8125rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .DockControls :is(button, select):disabled {
+        opacity: 0.55;
+        cursor: default;
     }
 
     .SpeedLabel {
+        display: grid;
+        place-items: center;
         color: var(--Muted);
     }
 
@@ -299,23 +384,6 @@
         border: 1px solid var(--Border);
         border-radius: 8px;
         background: var(--Background);
-    }
-
-    .FullscreenButton {
-        padding: 5px 12px;
-        border: 1px solid var(--Border);
-        border-radius: 999px;
-        background: var(--Background);
-        cursor: pointer;
-    }
-
-    .QueueToggle {
-        justify-self: start;
-        padding: 5px 12px;
-        border: 1px solid var(--Border);
-        border-radius: 999px;
-        background: var(--Background);
-        cursor: pointer;
     }
 
     .QueueList {
