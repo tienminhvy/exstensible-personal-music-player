@@ -69,7 +69,7 @@
     </button>
 </header>
 
-<main class="ShellMain">
+<main class="ShellMain" class:VideoDocked={player.videoRevealed}>
     <SearchPanel {importedIds} onImported={noteImported} />
     <LibraryPanel
         {tracks}
@@ -125,6 +125,15 @@
         /* Bottom padding clears the fixed player dock so the last library
          * rows stay reachable above it. */
         padding: 14px 16px 190px;
+    }
+
+    /* While the video is revealed, a media section docks above the
+     * player on desktop: grow the page's bottom padding so the last
+     * library rows stay reachable above both fixed sections. */
+    @media (min-width: 760px) {
+        .VideoDocked {
+            padding-bottom: calc(190px + 40vh + 24px);
+        }
     }
 
     /* Mobile-first: the two panels sit side by side on wider screens. */

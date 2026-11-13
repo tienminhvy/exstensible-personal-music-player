@@ -64,6 +64,21 @@
 </script>
 
 <section class="PlayerDock" aria-label="Player">
+    {#if browser}
+        <video
+            bind:this={mediaElement}
+            class={player.current?.videoPath && player.videoRevealed ? 'DockVideo' : 'NativeMedia'}
+            preload="metadata"
+            playsinline
+            ondblclick={toggleFullscreen}
+            onplay={() => player.playStarted()}
+            onpause={() => player.playPaused()}
+            ontimeupdate={() => player.progressTick(mediaElement?.currentTime ?? 0)}
+            onloadedmetadata={() => player.metadataLoaded(mediaElement?.duration ?? 0)}
+            onended={() => void player.trackEnded()}
+            onerror={() => player.playbackFailed()}
+        ></video>
+    {/if}
     <div class="DockInner">
         {#if browser && player.current}
             <input
@@ -223,21 +238,6 @@
             {/if}
         {/if}
     </div>
-    {#if browser}
-        <video
-            bind:this={mediaElement}
-            class={player.current?.videoPath && player.videoRevealed ? 'DockVideo' : 'NativeMedia'}
-            preload="metadata"
-            playsinline
-            ondblclick={toggleFullscreen}
-            onplay={() => player.playStarted()}
-            onpause={() => player.playPaused()}
-            ontimeupdate={() => player.progressTick(mediaElement?.currentTime ?? 0)}
-            onloadedmetadata={() => player.metadataLoaded(mediaElement?.duration ?? 0)}
-            onended={() => void player.trackEnded()}
-            onerror={() => player.playbackFailed()}
-        ></video>
-    {/if}
 </section>
 
 <style>
@@ -272,6 +272,17 @@
         border: 1px solid var(--Border);
         border-radius: 8px;
         background: #000;
+    }
+
+    /* Desktop: the revealed video is a second docked section stacked
+     * above the player controls — same fixed zone, same 1080px inner
+     * width, with padding as its own card. Mobile keeps it inline. */
+    @media (min-width: 760px) {
+        .DockVideo {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 8px;
+        }
     }
 
     .NativeMedia {

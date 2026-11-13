@@ -82,9 +82,7 @@
         <line x1="12" y1="8" x2="12" y2="16" />
         <line x1="8" y1="12" x2="16" y2="12" />
     {:else if name === 'theme'}
-        <polyline points="23 4 23 10 17 10" />
-        <polyline points="1 20 1 14 7 14" />
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
-        <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 2a10 10 0 0 1 0 20Z" fill="currentColor" stroke="none" />
     {/if}
 </svg>

@@ -60,6 +60,13 @@
     let formatsStateByVideoId = new SvelteMap<string, 'loading' | 'ready' | 'failed'>();
     let pickedByVideoId = new SvelteMap<string, FormatOption>();
 
+    // Importing with no resolution picked requires an explicit
+    // confirm (audio-only default): the first click arms the row's
+    // Import button as "Audio only", the second click imports. One
+    // armed row at a time; a picked resolution imports immediately.
+    let armedAudioVideoId = $state<string | null>(null);
+    let audioArmTimer: ReturnType<typeof setTimeout> | undefined;
+
     let searchToken = 0;
 
     const search = debounce((value: string) => {
@@ -135,6 +142,7 @@
     // object is what the import POST sends as `resolution` (the route
     // keeps height + ext of it).
     function pickFormat(result: VideoResult, event: Event) {
+        disarmAudioArm();
         const select = event.currentTarget as HTMLSelectElement;
         const index = Number(select.value);
         const formats = formatsByVideoId.get(result.videoId) ?? [];
@@ -147,7 +155,51 @@
         }
     }
 
+    function disarmAudioArm() {
+        armedAudioVideoId = null;
+        if (audioArmTimer !== undefined) {
+            clearTimeout(audioArmTimer);
+            audioArmTimer = undefined;
+        }
+    }
+
+    function onImportClick(result: VideoResult) {
+        if (importingId !== '' || importedIds.has(result.videoId)) {
+            return;
+        }
+        if (pickedByVideoId.has(result.videoId)) {
+            disarmAudioArm();
+            void importTrack(result);
+            return;
+        }
+        if (armedAudioVideoId === result.videoId) {
+            disarmAudioArm();
+            void importTrack(result);
+            return;
+        }
+        armedAudioVideoId = result.videoId;
+        if (audioArmTimer !== undefined) {
+            clearTimeout(audioArmTimer);
+            audioArmTimer = undefined;
+        }
+        audioArmTimer = setTimeout(disarmAudioArm, 4000);
+    }
+
+    function importLabel(result: VideoResult): string {
+        if (importingId === result.videoId) {
+            return `Importing ${result.title}`;
+        }
+        if (importedIds.has(result.videoId)) {
+            return `${result.title} is already imported`;
+        }
+        if (armedAudioVideoId === result.videoId) {
+            return `Confirm audio-only import of ${result.title}`;
+        }
+        return `Import ${result.title}`;
+    }
+
     async function importTrack(result: VideoResult) {
+        disarmAudioArm();
         importingId = result.videoId;
         importStatus = '';
         importProgress = null;
@@ -345,17 +397,9 @@
                         class:ImportButtonImported={importedIds.has(result.videoId)}
                         type="button"
                         disabled={importingId !== '' || importedIds.has(result.videoId)}
-                        aria-label={importingId === result.videoId
-                            ? `Importing ${result.title}`
-                            : importedIds.has(result.videoId)
-                              ? `${result.title} is already imported`
-                              : `Import ${result.title}`}
-                        title={importingId === result.videoId
-                            ? `Importing ${result.title}`
-                            : importedIds.has(result.videoId)
-                              ? `${result.title} is already imported`
-                              : `Import ${result.title}`}
-                        onclick={() => importTrack(result)}
+                        aria-label={importLabel(result)}
+                        title={importLabel(result)}
+                        onclick={() => onImportClick(result)}
                     >
                         {#if importingId === result.videoId}
                             <span class="IconRow">
@@ -368,6 +412,11 @@
                             </span>
                         {:else if importedIds.has(result.videoId)}
                             <Icon name="imported" />
+                        {:else if armedAudioVideoId === result.videoId}
+                            <span class="IconRow">
+                                <Icon name="import" />
+                                <span class="ImportAudioOnly">Audio only</span>
+                            </span>
                         {:else}
                             <Icon name="import" />
                         {/if}
@@ -507,6 +556,11 @@
     .ImportPercent {
         font-size: 0.75rem;
         font-variant-numeric: tabular-nums;
+    }
+
+    .ImportAudioOnly {
+        font-size: 0.75rem;
+        white-space: nowrap;
     }
 
     .ImportButton:disabled {
