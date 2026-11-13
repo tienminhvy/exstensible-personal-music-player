@@ -12,6 +12,16 @@
         }
     });
 
+    /* Page-eviction survival: flush the player state synchronously when
+     * the page goes away, so the restored position is never more than
+     * the last save behind. */
+    $effect(() => {
+        if (!browser) return;
+        const flush = () => player.persistNow();
+        window.addEventListener('pagehide', flush);
+        return () => window.removeEventListener('pagehide', flush);
+    });
+
     const repeatLabels: Record<RepeatMode, string> = {
         none: 'Repeat: None',
         all: 'Repeat: All',

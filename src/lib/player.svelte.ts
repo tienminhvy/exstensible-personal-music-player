@@ -1,3 +1,4 @@
+import { browser } from '$app/env';
 import type { TrackRow } from '#lib/track.ts';
 
 function streamUrl(trackId: string): string {
@@ -7,6 +8,61 @@ function streamUrl(trackId: string): string {
 export type RepeatMode = 'none' | 'all' | 'one';
 
 const repeatCycle: RepeatMode[] = ['none', 'all', 'one'];
+
+/* Shape of the persisted player state (T4.3): everything a reload needs
+ * to restore the queue paused at its saved position. `playing` is never
+ * persisted — a reload always restores paused. */
+const storageKey = 'player';
+
+interface SavedPlayerState {
+    queue: TrackRow[];
+    currentIndex: number;
+    position: number;
+    repeat: RepeatMode;
+    speed: number;
+}
+
+function readSavedPlayerState(): SavedPlayerState | null {
+    if (!browser) return null;
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw === null) return null;
+        const parsed: unknown = JSON.parse(raw);
+        if (typeof parsed !== 'object' || parsed === null) return null;
+        const candidate = parsed as Partial<SavedPlayerState>;
+        if (!Array.isArray(candidate.queue)) return null;
+        const queue = candidate.queue.filter(
+            (entry): entry is TrackRow =>
+                typeof entry === 'object' &&
+                entry !== null &&
+                typeof (entry as TrackRow).id === 'string' &&
+                typeof (entry as TrackRow).title === 'string'
+        );
+        const rawIndex = candidate.currentIndex;
+        const currentIndex =
+            typeof rawIndex === 'number' && Number.isFinite(rawIndex) && Number.isInteger(rawIndex)
+                ? Math.min(Math.max(rawIndex, -1), queue.length - 1)
+                : -1;
+        const repeat = repeatCycle.includes(candidate.repeat as RepeatMode)
+            ? (candidate.repeat as RepeatMode)
+            : 'none';
+        const speed =
+            typeof candidate.speed === 'number' &&
+            Number.isFinite(candidate.speed) &&
+            candidate.speed > 0
+                ? candidate.speed
+                : 1;
+        const position =
+            typeof candidate.position === 'number' &&
+            Number.isFinite(candidate.position) &&
+            candidate.position >= 0
+                ? candidate.position
+                : 0;
+        return { queue, currentIndex, position, repeat, speed };
+    } catch {
+        return null;
+    }
+}
 
 /*
  * User selection is authoritative (legacy player-core.md epoch guard):
@@ -30,6 +86,14 @@ class PlayerStore {
 
     #element: HTMLAudioElement | null = null;
     #epoch = 0;
+    #pendingPosition: number | null = null;
+    #lastPersist = 0;
+
+    constructor() {
+        if (browser) {
+            this.#restore();
+        }
+    }
 
     get current(): TrackRow | null {
         return this.queue[this.currentIndex] ?? null;
@@ -57,6 +121,7 @@ class PlayerStore {
      * Duplicates are allowed; select jumps to an already-queued track. */
     enqueue(track: TrackRow): void {
         this.queue.push(track);
+        this.#persist();
     }
 
     /* Adjacent-swap reorder that never disturbs playback: the element is
@@ -83,6 +148,7 @@ class PlayerStore {
         } else if (this.currentIndex === other) {
             this.currentIndex = index;
         }
+        this.#persist();
     }
 
     async next(): Promise<void> {
@@ -116,11 +182,13 @@ class PlayerStore {
 
     cycleRepeat(): void {
         this.repeat = repeatCycle[(repeatCycle.indexOf(this.repeat) + 1) % repeatCycle.length];
+        this.#persist();
     }
 
     setSpeed(rate: number): void {
         if (!Number.isFinite(rate) || rate <= 0) return;
         this.speed = rate;
+        this.#persist();
         const element = this.#element;
         if (element) {
             this.#applySpeed(element);
@@ -146,8 +214,10 @@ class PlayerStore {
         if (!element || !this.current) return;
         ++this.#epoch;
         const clamped = Math.min(Math.max(time, 0), this.duration);
+        this.#pendingPosition = null;
         element.currentTime = clamped;
         this.currentTime = clamped;
+        this.#persist();
     }
 
     playStarted(): void {
@@ -157,11 +227,19 @@ class PlayerStore {
 
     playPaused(): void {
         this.playing = false;
+        this.#persist();
     }
 
     progressTick(seconds: number): void {
         if (Number.isFinite(seconds) && seconds >= 0) {
             this.currentTime = seconds;
+            /* Throttled position save: timeupdate fires ~4×/s while
+             * playing; persist at most every 2s so page eviction keeps
+             * the position within seconds (#persist refreshes the
+             * throttle stamp for every save path). */
+            if (Date.now() - this.#lastPersist >= 2000) {
+                this.#persist();
+            }
         }
     }
 
@@ -187,10 +265,12 @@ class PlayerStore {
         if (this.repeat === 'one') {
             element.currentTime = 0;
             this.currentTime = 0;
+            this.#persist();
             await this.#start(element);
             return;
         }
         if (this.currentIndex === this.queue.length - 1 && this.repeat !== 'all') {
+            this.#persist();
             return;
         }
         this.currentIndex =
@@ -205,9 +285,28 @@ class PlayerStore {
         this.error = 'The audio file could not be loaded.';
     }
 
+    /* Resume without clobbering a restored-but-not-yet-loaded element:
+     * after a page reload nothing has a src yet, so the first Play loads
+     * the current track and consumes the saved position (setting
+     * currentTime before metadata loads plants the default playback
+     * start position). A user seek cleared the saved position first. */
     async #resume(): Promise<void> {
         const element = this.#element;
-        if (!element) return;
+        const track = this.current;
+        if (!element || !track) return;
+        if (element.getAttribute('src') !== streamUrl(track.id)) {
+            element.src = streamUrl(track.id);
+            element.load();
+            this.duration = track.durationSec ?? 0;
+            this.error = '';
+            this.#applySpeed(element);
+        }
+        const pending = this.#pendingPosition;
+        if (pending !== null) {
+            element.currentTime = pending;
+            this.currentTime = pending;
+            this.#pendingPosition = null;
+        }
         await this.#start(element);
     }
 
@@ -237,7 +336,53 @@ class PlayerStore {
         this.duration = track.durationSec ?? 0;
         this.error = '';
         this.#applySpeed(element);
+        this.#persist();
         await this.#start(element);
+    }
+
+    /* Reload hydration (T4.3): queue/currentIndex/position/repeat/
+     * speed come back from localStorage; playback always restores
+     * paused. The saved position waits as #pendingPosition until the
+     * first Play (or a superseding seek) consumes it. Speed rides the
+     * attach() call of #applySpeed so BOTH rates carry the restored
+     * speed from the first element interaction. */
+    #restore(): void {
+        const saved = readSavedPlayerState();
+        if (saved === null) return;
+        this.queue = saved.queue;
+        this.currentIndex = saved.currentIndex;
+        this.repeat = saved.repeat;
+        this.speed = saved.speed;
+        const current = this.current;
+        this.duration = current?.durationSec ?? 0;
+        const maxDuration = this.duration;
+        const position = maxDuration > 0 ? Math.min(saved.position, maxDuration) : saved.position;
+        this.currentTime = position;
+        if (current !== null) {
+            this.#pendingPosition = position;
+        }
+    }
+
+    persistNow(): void {
+        this.#persist();
+    }
+
+    #persist(): void {
+        if (!browser) return;
+        this.#lastPersist = Date.now();
+        const saved: SavedPlayerState = {
+            queue: this.queue,
+            currentIndex: this.currentIndex,
+            position: this.currentTime,
+            repeat: this.repeat,
+            speed: this.speed
+        };
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(saved));
+        } catch {
+            /* Persistence is best-effort: storage may be unavailable
+             * (private mode, quota) without breaking playback. */
+        }
     }
 
     /* Mirror the speed onto both rates: load() resets playbackRate to
