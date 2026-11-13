@@ -1,8 +1,17 @@
 import { browser } from '$app/env';
 import type { TrackRow } from '#lib/track.ts';
 
-function streamUrl(trackId: string): string {
-    return `/api/tracks/${trackId}/stream`;
+/* The media element doubles as the video display (legacy
+ * library-download.md): a row carrying a video file streams its video
+ * file (`?variant=video`) through the same element; audio-only rows keep
+ * the plain audio stream. */
+function streamUrl(trackId: string, variant: 'audio' | 'video'): string {
+    const base = `/api/tracks/${trackId}/stream`;
+    return variant === 'video' ? `${base}?variant=video` : base;
+}
+
+function variantFor(track: TrackRow | null): 'audio' | 'video' {
+    return track?.videoPath ? 'video' : 'audio';
 }
 
 export type RepeatMode = 'none' | 'all' | 'one';
@@ -84,7 +93,7 @@ class PlayerStore {
     duration = $state(0);
     error = $state('');
 
-    #element: HTMLAudioElement | null = null;
+    #element: HTMLMediaElement | null = null;
     #epoch = 0;
     #pendingPosition: number | null = null;
     #lastPersist = 0;
@@ -99,7 +108,7 @@ class PlayerStore {
         return this.queue[this.currentIndex] ?? null;
     }
 
-    attach(element: HTMLAudioElement): void {
+    attach(element: HTMLMediaElement): void {
         this.#element = element;
         this.#applySpeed(element);
     }
@@ -107,11 +116,19 @@ class PlayerStore {
     /* Play a track now: a track that is already queued jumps to its queue
      * slot (restart when it is the current one); a new track is appended
      * and played — the rest of the queue stays intact (T4.2 adds the
-     * queue UI around this model). */
+     * queue UI around this model). The jump refreshes the stored row with
+     * the library's current data, so a row that gained a video file after
+     * it was queued plays as video instead of showing a stale audio-only
+     * entry (T6.1). */
     async select(track: TrackRow): Promise<void> {
         ++this.#epoch;
         const existing = this.queue.findIndex((entry) => entry.id === track.id);
-        this.currentIndex = existing === -1 ? this.queue.push(track) - 1 : existing;
+        if (existing === -1) {
+            this.currentIndex = this.queue.push(track) - 1;
+        } else {
+            this.queue[existing] = track;
+            this.currentIndex = existing;
+        }
         await this.#beginPlayback();
     }
 
@@ -282,20 +299,22 @@ class PlayerStore {
 
     playbackFailed(): void {
         this.playing = false;
-        this.error = 'The audio file could not be loaded.';
+        this.error = 'The media file could not be loaded.';
     }
 
     /* Resume without clobbering a restored-but-not-yet-loaded element:
      * after a page reload nothing has a src yet, so the first Play loads
-     * the current track and consumes the saved position (setting
-     * currentTime before metadata loads plants the default playback
-     * start position). A user seek cleared the saved position first. */
+     * the current track (through its variant: video rows stream the video
+     * file) and consumes the saved position (setting currentTime before
+     * metadata loads plants the default playback start position). A user
+     * seek cleared the saved position first. */
     async #resume(): Promise<void> {
         const element = this.#element;
         const track = this.current;
         if (!element || !track) return;
-        if (element.getAttribute('src') !== streamUrl(track.id)) {
-            element.src = streamUrl(track.id);
+        const variant = variantFor(track);
+        if (element.getAttribute('src') !== streamUrl(track.id, variant)) {
+            element.src = streamUrl(track.id, variant);
             element.load();
             this.duration = track.durationSec ?? 0;
             this.error = '';
@@ -313,7 +332,7 @@ class PlayerStore {
     /* Play attempt with its own epoch capture: user paths have already
      * bumped before reaching here; deferred advances must not. Failure
      * writes only happen while the epoch still matches. */
-    async #start(element: HTMLAudioElement): Promise<void> {
+    async #start(element: HTMLMediaElement): Promise<void> {
         const epoch = this.#epoch;
         try {
             await element.play();
@@ -330,7 +349,7 @@ class PlayerStore {
         const element = this.#element;
         const track = this.current;
         if (!element || !track) return;
-        element.src = streamUrl(track.id);
+        element.src = streamUrl(track.id, variantFor(track));
         element.load();
         this.currentTime = 0;
         this.duration = track.durationSec ?? 0;
@@ -388,7 +407,7 @@ class PlayerStore {
     /* Mirror the speed onto both rates: load() resets playbackRate to
      * defaultPlaybackRate, so setting default keeps the speed across
      * track changes. */
-    #applySpeed(element: HTMLAudioElement): void {
+    #applySpeed(element: HTMLMediaElement): void {
         element.playbackRate = this.speed;
         element.defaultPlaybackRate = this.speed;
     }

@@ -3,13 +3,13 @@
     import { player, type RepeatMode } from '#lib/player.svelte.ts';
     import { formatClock } from '#lib/time.ts';
 
-    let audioElement = $state<HTMLAudioElement>();
+    let mediaElement = $state<HTMLVideoElement>();
     let scrubTime = $state<number | null>(null);
     let queueOpen = $state(false);
 
     $effect(() => {
-        if (audioElement) {
-            player.attach(audioElement);
+        if (mediaElement) {
+            player.attach(mediaElement);
         }
     });
 
@@ -47,6 +47,23 @@
 
     function onQueueToggle(): void {
         queueOpen = !queueOpen;
+    }
+
+    /* Fullscreen toggle (legacy library-download.md parity): button plus
+     * double-click on the video. Fullscreen can be unavailable or
+     * rejected; playback never depends on it. */
+    async function toggleFullscreen(): Promise<void> {
+        const el = mediaElement;
+        if (!el) return;
+        try {
+            if (document.fullscreenElement === el) {
+                await document.exitFullscreen();
+            } else {
+                await el.requestFullscreen();
+            }
+        } catch {
+            return;
+        }
     }
 </script>
 
@@ -98,6 +115,16 @@
                         <option value={rate}>{rate}×</option>
                     {/each}
                 </select>
+                {#if player.current.videoPath}
+                    <button
+                        class="FullscreenButton"
+                        type="button"
+                        aria-label="Toggle video fullscreen"
+                        onclick={() => void toggleFullscreen()}
+                    >
+                        Fullscreen
+                    </button>
+                {/if}
             </div>
             {#if player.error}
                 <p class="Hint" role="status">{player.error}</p>
@@ -153,17 +180,19 @@
         {/if}
     </div>
     {#if browser}
-        <audio
-            bind:this={audioElement}
-            class="NativeAudio"
+        <video
+            bind:this={mediaElement}
+            class={player.current?.videoPath ? 'DockVideo' : 'NativeMedia'}
             preload="metadata"
+            playsinline
+            ondblclick={toggleFullscreen}
             onplay={() => player.playStarted()}
             onpause={() => player.playPaused()}
-            ontimeupdate={() => player.progressTick(audioElement?.currentTime ?? 0)}
-            onloadedmetadata={() => player.metadataLoaded(audioElement?.duration ?? 0)}
+            ontimeupdate={() => player.progressTick(mediaElement?.currentTime ?? 0)}
+            onloadedmetadata={() => player.metadataLoaded(mediaElement?.duration ?? 0)}
             onended={() => void player.trackEnded()}
             onerror={() => player.playbackFailed()}
-        ></audio>
+        ></video>
     {/if}
 </section>
 
@@ -186,6 +215,21 @@
         gap: 8px;
         max-width: 1080px;
         margin: 0 auto;
+    }
+
+    /* The media element doubles as the video display: visible (bounded)
+     * while the current row carries a video file, hidden otherwise —
+     * audio-only rows look and play exactly as before. */
+    .DockVideo {
+        width: 100%;
+        max-height: 40vh;
+        border: 1px solid var(--Border);
+        border-radius: 8px;
+        background: #000;
+    }
+
+    .NativeMedia {
+        display: none;
     }
 
     .DockSeek {
@@ -257,6 +301,14 @@
         background: var(--Background);
     }
 
+    .FullscreenButton {
+        padding: 5px 12px;
+        border: 1px solid var(--Border);
+        border-radius: 999px;
+        background: var(--Background);
+        cursor: pointer;
+    }
+
     .QueueToggle {
         justify-self: start;
         padding: 5px 12px;
@@ -322,9 +374,5 @@
     .QueueMoveButton:disabled {
         cursor: not-allowed;
         opacity: 0.5;
-    }
-
-    .NativeAudio {
-        display: none;
     }
 </style>
