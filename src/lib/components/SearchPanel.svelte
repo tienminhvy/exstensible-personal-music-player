@@ -73,7 +73,11 @@
             const response = await fetch('/api/download', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ videoId: result.videoId })
+                body: JSON.stringify({
+                    videoId: result.videoId,
+                    channel: result.channel,
+                    thumbnailUrl: result.thumbnailUrl
+                })
             });
             if (response.ok) {
                 importStatus = `Imported ${result.title}`;

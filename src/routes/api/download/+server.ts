@@ -31,6 +31,8 @@ const downloadFlags = () => {
 
 interface DownloadRequest {
     videoId?: unknown;
+    channel?: unknown;
+    thumbnailUrl?: unknown;
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -52,7 +54,12 @@ export const POST: RequestHandler = async ({ request }) => {
 
     importsInFlight.add(videoId);
     try {
-        const trackData = await downloadAudio(videoId);
+        const audioData = await downloadAudio(videoId);
+        const trackData = {
+            ...audioData,
+            channel: stringOrNull(body?.channel),
+            thumbnailUrl: stringOrNull(body?.thumbnailUrl)
+        };
         const track = await prisma.track.upsert({
             where: { youtubeId: videoId },
             // Re-importing a known clip refreshes its row instead of
@@ -93,6 +100,14 @@ interface ImportedAudio {
     title: string;
     mediaPath: string;
     durationSec: number | null;
+}
+
+function stringOrNull(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed;
 }
 
 function roundedOrNull(duration: number | undefined): number | null {
