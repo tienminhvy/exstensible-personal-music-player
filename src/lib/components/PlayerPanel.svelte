@@ -1,6 +1,6 @@
 <script lang="ts">
     import { browser } from '$app/env';
-    import { player } from '#lib/player.svelte.ts';
+    import { player, type RepeatMode } from '#lib/player.svelte.ts';
     import { formatClock } from '#lib/time.ts';
 
     let audioElement = $state<HTMLAudioElement>();
@@ -12,6 +12,13 @@
         }
     });
 
+    const repeatLabels: Record<RepeatMode, string> = {
+        none: 'Repeat: None',
+        all: 'Repeat: All',
+        one: 'Repeat: One'
+    };
+    const speedOptions = [0.75, 1, 1.25, 1.5, 2];
+
     function onScrub(event: Event): void {
         scrubTime = Number((event.currentTarget as HTMLInputElement).value);
     }
@@ -22,6 +29,10 @@
         }
         scrubTime = null;
     }
+
+    function onSpeed(event: Event): void {
+        player.setSpeed(Number((event.currentTarget as HTMLSelectElement).value));
+    }
 </script>
 
 <section class="Panel PlayerPanel">
@@ -29,12 +40,29 @@
     {#if browser && player.current}
         <p class="PlayerTitle">{player.current.title}</p>
         <div class="PlayerControls">
+            <button class="TransportButton" type="button" onclick={() => void player.previous()}>
+                Prev
+            </button>
             <button class="PlayButton" type="button" onclick={() => player.toggle()}>
                 {player.playing ? 'Pause' : 'Play'}
+            </button>
+            <button class="TransportButton" type="button" onclick={() => void player.next()}>
+                Next
             </button>
             <span class="PlayerTime">
                 {formatClock(scrubTime ?? player.currentTime)} / {formatClock(player.duration)}
             </span>
+        </div>
+        <div class="PlayerOptions">
+            <button class="RepeatButton" type="button" onclick={() => player.cycleRepeat()}>
+                {repeatLabels[player.repeat]}
+            </button>
+            <label class="SpeedLabel" for="player-speed">Speed</label>
+            <select id="player-speed" class="SpeedSelect" value={player.speed} onchange={onSpeed}>
+                {#each speedOptions as rate (rate)}
+                    <option value={rate}>{rate}×</option>
+                {/each}
+            </select>
         </div>
         <input
             class="SeekBar"
@@ -60,7 +88,7 @@
             onpause={() => player.playPaused()}
             ontimeupdate={() => player.progressTick(audioElement?.currentTime ?? 0)}
             onloadedmetadata={() => player.metadataLoaded(audioElement?.duration ?? 0)}
-            onended={() => player.trackEnded()}
+            onended={() => void player.trackEnded()}
             onerror={() => player.playbackFailed()}
         ></audio>
     {/if}
@@ -76,7 +104,16 @@
     .PlayerControls {
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 10px;
+    }
+
+    .TransportButton {
+        min-width: 62px;
+        padding: 7px 12px;
+        border: 1px solid var(--Border);
+        border-radius: 999px;
+        background: var(--Background);
+        cursor: pointer;
     }
 
     .PlayButton {
@@ -92,6 +129,32 @@
     .PlayerTime {
         color: var(--Muted);
         font-variant-numeric: tabular-nums;
+    }
+
+    .PlayerOptions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .RepeatButton {
+        padding: 5px 12px;
+        border: 1px solid var(--Border);
+        border-radius: 999px;
+        background: var(--Background);
+        cursor: pointer;
+    }
+
+    .SpeedLabel {
+        color: var(--Muted);
+    }
+
+    .SpeedSelect {
+        padding: 5px 8px;
+        border: 1px solid var(--Border);
+        border-radius: 8px;
+        background: var(--Background);
     }
 
     .SeekBar {
