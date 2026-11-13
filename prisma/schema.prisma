@@ -1,5 +1,5 @@
 // Prisma schema for the personal music player library.
-// Audio-only in this slice: one mediaPath per Track.
+// One Track row per youtubeId: audio always; video optional.
 
 generator client {
   provider = "prisma-client"
@@ -20,6 +20,14 @@ model Track {
   // couple the DB to one container's filesystem layout and previously
   // caused the library-loss incident; keep this relative.
   mediaPath   String
+  // Optional video file, stored RELATIVE to the media dir for the same
+  // reason as mediaPath (<youtubeId>.<ext>); set only when the user
+  // imports a video resolution.
+  videoPath   String?
+  // Search-result metadata captured at import time; nullable so rows
+  // imported before this column existed stay valid.
+  channel     String?
+  thumbnailUrl String?
   durationSec Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
