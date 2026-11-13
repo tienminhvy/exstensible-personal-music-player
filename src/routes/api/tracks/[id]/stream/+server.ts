@@ -6,12 +6,15 @@ import { prisma } from '#lib/server/prisma.ts';
 import type { RequestHandler } from './$types';
 
 const MIME_BY_EXTENSION: Record<string, string> = {
-    '.mp3': 'audio/mpeg'
+    '.mp3': 'audio/mpeg',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.3gp': 'video/3gpp'
 };
 
-function mimeTypeFor(audioFile: string): string {
-    const dot = audioFile.lastIndexOf('.');
-    return MIME_BY_EXTENSION[audioFile.slice(dot)] ?? 'application/octet-stream';
+function mimeTypeFor(mediaFile: string): string {
+    const dot = mediaFile.lastIndexOf('.');
+    return MIME_BY_EXTENSION[mediaFile.slice(dot)] ?? 'application/octet-stream';
 }
 
 interface ByteRange {
@@ -41,8 +44,8 @@ function parseRange(header: string | null, size: number): ByteRange | 'unsatisfi
     return { start, end: Math.min(requestedEnd, size - 1) };
 }
 
-function audioResponse(
-    audioFile: string,
+function mediaResponse(
+    mediaFile: string,
     mimeType: string,
     status: number,
     range: ByteRange | null,
@@ -50,7 +53,7 @@ function audioResponse(
 ): Response {
     const streamArgs = range ? { start: range.start, end: range.end } : undefined;
     const body = Readable.toWeb(
-        createReadStream(audioFile, streamArgs)
+        createReadStream(mediaFile, streamArgs)
     ) as ReadableStream<Uint8Array>;
     const headers: Record<string, string> = {
         'Content-Type': mimeType,
@@ -63,15 +66,23 @@ function audioResponse(
     return new Response(body, { status, headers });
 }
 
-export const GET: RequestHandler = async ({ params, request }) => {
+export const GET: RequestHandler = async ({ params, request, url }) => {
     const track = await prisma.track.findUnique({ where: { id: params.id } });
     if (!track) {
         return Response.json({ error: 'Track not found.' }, { status: 404 });
     }
-    const audioFile = join(MEDIA_DIR, track.mediaPath);
+    // Video is served opt-in (`?variant=video`) to the doubled media
+    // element; the audio file stays the default stream for every
+    // consumer that does not ask for it.
+    const variant = url.searchParams.get('variant');
+    const relativePath = variant === 'video' ? track.videoPath : track.mediaPath;
+    if (!relativePath) {
+        return Response.json({ error: 'Track has no video file.' }, { status: 404 });
+    }
+    const mediaFile = join(MEDIA_DIR, relativePath);
     let size: number;
     try {
-        size = statSync(audioFile).size;
+        size = statSync(mediaFile).size;
     } catch {
         // Rows keep RELATIVE media paths on purpose (library-loss
         // incident); a missing file behind a live row is reported, not
@@ -79,7 +90,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
         return Response.json({ error: 'File not found.' }, { status: 404 });
     }
 
-    const mimeType = mimeTypeFor(audioFile);
+    const mimeType = mimeTypeFor(mediaFile);
     const range = parseRange(request.headers.get('range'), size);
     if (range === 'unsatisfiable') {
         return new Response(null, {
@@ -87,5 +98,5 @@ export const GET: RequestHandler = async ({ params, request }) => {
             headers: { 'Content-Range': `bytes */${size}` }
         });
     }
-    return audioResponse(audioFile, mimeType, range ? 206 : 200, range, size);
+    return mediaResponse(mediaFile, mimeType, range ? 206 : 200, range, size);
 };
