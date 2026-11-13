@@ -1,5 +1,5 @@
 <script lang="ts">
-    /* Icon-only control buttons (repair R3): dependency-free inline-SVG
+    /* Icon-only control buttons: dependency-free inline-SVG
      * glyph set. Every consumer button carries its full wording in an
      * aria-label/title — the icon is the only visible content. */
     type IconName =

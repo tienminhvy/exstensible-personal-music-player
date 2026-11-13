@@ -116,7 +116,7 @@
         const videoId = result.videoId;
         /* 'ready' AND 'loading' both bail: focus regains on every click
          * of the select, so without the loading guard each re-focus
-         * re-fired the metadata fetch (repair R1 pile-up bug). A failed
+         * re-fired the metadata fetch. A failed
          * load stays retryable on a later focus. */
         const state = formatsStateByVideoId.get(videoId);
         if (state === 'ready' || state === 'loading') {
@@ -327,7 +327,7 @@
                     {/if}
                 </span>
                 <span class="ImportControls">
-                    <!-- Repair R4: the option NEVER mutates after mount — a
+                    <!-- The option NEVER mutates after mount — a
                          state machine of placeholder button (idle/loading/
                          failed) → final ready select. Rebuilding a native
                          select's children around an open popup glitched

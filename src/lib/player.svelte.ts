@@ -1,13 +1,13 @@
 import { browser } from '$app/env';
 import type { TrackRow } from '#lib/track.ts';
 
-/* The media element doubles as the video display (legacy
- * library-download.md): a row carrying a video file streams its video
+/* The media element doubles as the video display: a row carrying a
+ * video file streams its video
  * file (`?variant=video`) through the same element — but only while the
  * user has revealed the video display; otherwise every track (video
  * rows included) plays the plain audio stream, so video never decodes
- * in the background (repair R2: the always-decoding dock video froze
- * the user's machine). */
+ * in the background (an always-decoding dock video once froze the
+ * user's machine). */
 function streamUrl(trackId: string, variant: 'audio' | 'video'): string {
     const base = `/api/tracks/${trackId}/stream`;
     return variant === 'video' ? `${base}?variant=video` : base;
@@ -17,7 +17,7 @@ export type RepeatMode = 'none' | 'all' | 'one';
 
 const repeatCycle: RepeatMode[] = ['none', 'all', 'one'];
 
-/* Shape of the persisted player state (T4.3): everything a reload needs
+/* Shape of the persisted player state: everything a reload needs
  * to restore the queue paused at its saved position. `playing` is never
  * persisted — a reload always restores paused. */
 const storageKey = 'player';
@@ -73,14 +73,15 @@ function readSavedPlayerState(): SavedPlayerState | null {
 }
 
 /*
- * User selection is authoritative (legacy player-core.md epoch guard):
+ * User selection is authoritative (the epoch guard):
  * every user action bumps the epoch, and every play attempt captures the
  * epoch it began under and bails if the user has acted again — a stale
  * start may never clobber a later selection or pause. Deferred advances
  * (natural end) capture WITHOUT bumping: a user action that already
  * happened keeps winning against a pending advance. Natural end advances
- * from the element's `ended` event — never a timer (2026-09-15 race
- * rule); every deferred advance keeps this pattern.
+ * from the element's `ended` event — never a timer (an advance timer
+ * fires on its own schedule and clobbers whatever the user just did);
+ * every deferred advance keeps this pattern.
  */
 class PlayerStore {
     queue = $state<TrackRow[]>([]);
@@ -91,7 +92,7 @@ class PlayerStore {
     currentTime = $state(0);
     duration = $state(0);
     error = $state('');
-    /* Video reveal (repair R2): video rows stream their audio variant
+    /* Video reveal: video rows stream their audio variant
      * until the user explicitly shows the video display. In-session
      * only — never persisted, so a reload starts hidden again. */
     videoRevealed = $state(false);
@@ -118,11 +119,11 @@ class PlayerStore {
 
     /* Play a track now: a track that is already queued jumps to its queue
      * slot (restart when it is the current one); a new track is appended
-     * and played — the rest of the queue stays intact (T4.2 adds the
-     * queue UI around this model). The jump refreshes the stored row with
+     * and played — the rest of the queue stays intact. The jump refreshes
+     * the stored row with
      * the library's current data, so a row that gained a video file after
      * it was queued plays as video instead of showing a stale audio-only
-     * entry (T6.1). */
+     * entry. */
     async select(track: TrackRow): Promise<void> {
         ++this.#epoch;
         const existing = this.queue.findIndex((entry) => entry.id === track.id);
@@ -219,7 +220,7 @@ class PlayerStore {
         return this.current?.videoPath && this.videoRevealed ? 'video' : 'audio';
     }
 
-    /* Show or hide the video display (repair R2). A videoPath row's
+    /* Show or hide the video display. A videoPath row's
      * element swaps variant at the current position, keeping the
      * element identity (same DOM node, so attach/epoch/persistence
      * contracts hold); playback resumes if it was playing. Audio-only
@@ -397,7 +398,7 @@ class PlayerStore {
         await this.#start(element);
     }
 
-    /* Reload hydration (T4.3): queue/currentIndex/position/repeat/
+    /* Reload hydration: queue/currentIndex/position/repeat/
      * speed come back from localStorage; playback always restores
      * paused. The saved position waits as #pendingPosition until the
      * first Play (or a superseding seek) consumes it. Speed rides the

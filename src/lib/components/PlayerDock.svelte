@@ -45,7 +45,7 @@
         queueOpen = !queueOpen;
     }
 
-    /* Fullscreen toggle (legacy library-download.md parity): button plus
+    /* Fullscreen toggle: button plus
      * double-click on the video. Fullscreen can be unavailable or
      * rejected; playback never depends on it. */
     async function toggleFullscreen(): Promise<void> {
@@ -284,8 +284,8 @@
 
     /* The media element doubles as the video display: visible (bounded)
      * only while the current row carries a video file AND the user has
-     * revealed the video display (repair R2 — hidden by default, video
-     * never decodes in the background); otherwise the element stays
+     * revealed the video display (hidden by default, so video never
+     * decodes in the background); otherwise the element stays
      * hidden and carries the audio stream. */
     .DockVideo {
         width: 100%;
@@ -359,7 +359,7 @@
         gap: 10px;
     }
 
-    /* Icon-only control buttons (repair R3): the glyph is the visible
+    /* Icon-only control buttons: the glyph is the visible
      * affordance; every button's aria-label/title carries the full
      * wording. */
     .IconButton {

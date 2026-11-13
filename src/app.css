@@ -1,7 +1,6 @@
 /*
  * Theme palettes applied via [data-theme] on the document element; the
- * value persists in localStorage — one device, one preference
- * (census app-shell.md known-bug warning).
+ * value persists in localStorage — one device, one preference.
  */
 :root,
 [data-theme='light'] {

@@ -8,8 +8,7 @@ import { VIDEO_ID_PATTERN } from '#lib/server/video-id.ts';
 import type { RequestHandler } from './$types';
 
 // Concurrent imports of the same clip corrupt its shared media file;
-// legacy gated downloads the same way (library-download.md, commit
-// 63ca42a).
+// imports are serialized per clip.
 const importsInFlight = new Set<string>();
 
 const audioFileFor = (youtubeId: string): string => join(MEDIA_DIR, `${youtubeId}.mp3`);
@@ -89,8 +88,7 @@ function parseResolution(value: unknown): RequestedResolution | 'invalid' | null
 
 // yt-dlp gets its totals from the source HTTP Content-Length; the
 // `[download] x% of ~N Unit` lines carry exactly those — so progress
-// rides the import response itself and no size endpoint is ever needed
-// (library-download.md learning).
+// rides the import response itself and no size endpoint is ever needed.
 function progressFromLine(
     phase: 'audio' | 'video',
     label: string | null,
@@ -160,8 +158,7 @@ export const POST: RequestHandler = async ({ request }) => {
         return Response.json({ error: 'This track is already downloading.' }, { status: 409 });
     }
     // A missing media dir usually means a missing volume mount; silently
-    // recreating it would strand the library (library-download.md known
-    // bug warning).
+    // recreating it would strand the library.
     if (!existsSync(MEDIA_DIR)) {
         return Response.json({ error: 'Media dir is missing; import refused.' }, { status: 500 });
     }

@@ -23,9 +23,8 @@ interface ByteRange {
 }
 
 // null → serve full (no Range, or malformed — malformed header is
-// ignored per RFC 9110). 'unsatisfiable' → the 416 contract (legacy
-// af614ba: out-of-bounds ranges must fail loudly, not clamp into
-// wrong audio).
+// ignored per RFC 9110). 'unsatisfiable' → 416: out-of-bounds ranges
+// must fail loudly, not clamp into wrong audio.
 function parseRange(header: string | null, size: number): ByteRange | 'unsatisfiable' | null {
     if (!header) return null;
     const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
@@ -84,9 +83,8 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
     try {
         size = statSync(mediaFile).size;
     } catch {
-        // Rows keep RELATIVE media paths on purpose (library-loss
-        // incident); a missing file behind a live row is reported, not
-        // recreated here.
+        // Rows keep RELATIVE media paths on purpose; a missing file
+        // behind a live row is reported, not recreated here.
         return Response.json({ error: 'File not found.' }, { status: 404 });
     }
 

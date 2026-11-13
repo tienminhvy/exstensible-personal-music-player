@@ -17,8 +17,8 @@ interface YouTubeSearchItem {
     };
 }
 
-// One YouTube API call per request, capped results; API quota is the
-// intake pipeline's shared constraint.
+// One YouTube API call per request, capped results — both limits
+// conserve the API quota granted to the key.
 const RESULTS_LIMIT = 10;
 
 export const GET: RequestHandler = async ({ url }) => {

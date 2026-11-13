@@ -17,8 +17,8 @@ model Track {
   // duplicating it.
   youtubeId   String   @unique
   // Stored RELATIVE to the media dir (<youtubeId>.mp3). Absolute paths
-  // couple the DB to one container's filesystem layout and previously
-  // caused the library-loss incident; keep this relative.
+  // couple the DB to one container's filesystem layout and once cost
+  // the whole library; keep this relative.
   mediaPath   String
   // Optional video file, stored RELATIVE to the media dir for the same
   // reason as mediaPath (<youtubeId>.<ext>); set only when the user
